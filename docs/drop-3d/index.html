@@ -30,13 +30,22 @@ button:focus-visible{outline:2px solid #fff;outline-offset:3px}.cta{width:100%;b
 .keys span{font-size:11px;color:#d1e8e8;letter-spacing:.10em;text-align:center;text-shadow:0 2px 6px #041018}
 .metrics{font-weight:750;color:var(--core)}a{color:#a9ffe9;text-underline-offset:2px}#fallback{margin-top:8px}
 @media(max-height:540px){.panel{padding:12px}h1,h2{font-size:31px;margin-bottom:6px}.label{font-size:10px}.value{font-size:19px}.head{padding-bottom:5px}.fine{margin-top:6px}.hud{top:max(6px,env(safe-area-inset-top))}}
+
+:root{--gold:#ffe283}
+#score,.metrics{color:var(--gold);text-shadow:0 1px 18px #ffb13c3a}
+#signal[data-tone=gold]{color:var(--gold)}
+#fatal-fade{position:absolute;inset:0;background:#03060c;opacity:0;z-index:1;pointer-events:none}
+#arena[data-impact=water] .hud{opacity:.36}
+#arena[data-impact=rock] .hud{opacity:.60}
+#arena[data-loot=yes] #score{color:#fff4be;text-shadow:0 0 14px #ffd56d,0 0 30px #e99739}
+#finish h2{font-size:clamp(33px,8vw,57px);line-height:.95}
 </style></head>
 <body><main id="arena" aria-label="HONOR X7d Drop Challenge 3D">
-<canvas id="scene" aria-label="Caída libre. Arrastrá para mover el teléfono." tabindex="0"></canvas><div id="vignette"></div>
+<canvas id="scene" aria-label="Caída libre. Arrastrá para mover el teléfono." tabindex="0"></canvas><div id="vignette"></div><div id="fatal-fade" aria-hidden="true"></div>
 <header class="hud"><div class="head"><strong class="brand">HONOR</strong><span class="code">X7d / DESCENSO 3D</span></div><div class="stats"><div class="stat"><span class="label">Puntaje</span><strong class="value" id="score">000</strong></div><div class="stat"><span class="label">Vidas</span><strong class="value" id="lives">◆ ◆ ◆</strong></div><div class="stat"><span class="label">Velocidad</span><strong class="value" id="time">0.0</strong></div></div><div class="progress"><span id="bar"></span></div><p id="phase">CAÍDA LIBRE</p><p id="signal"></p></header>
-<section class="panel" id="intro"><p class="eyebrow">Caída libre · Sin cronómetro</p><h1>Drop<br>Challenge <em>3D</em></h1><p>Agarrá el teléfono y arrastralo para esquivar los obstáculos. Juntá núcleos turquesa antes de quedarte sin vidas.</p><button class="cta" id="start">Iniciar descenso</button><p class="fine">Modelo ilustrativo. No es una prueba de resistencia. <a href="../">Versión original</a>.</p><p class="fine" id="fallback" hidden></p></section>
+<section class="panel" id="intro"><p class="eyebrow">Caída libre · Sin cronómetro</p><h1>Drop<br>Challenge <em>3D</em></h1><p>Agarrá el teléfono y arrastralo para esquivar los obstáculos. Juntá núcleos dorados antes de quedarte sin vidas.</p><button class="cta" id="start">Iniciar descenso</button><p class="fine">Modelo ilustrativo. No es una prueba de resistencia. <a href="../">Versión original</a>.</p><p class="fine" id="fallback" hidden></p></section>
 <div class="keys" id="keys" hidden><button id="left" type="button" aria-label="Mover a la izquierda">←</button><span>ARRASTRÁ EL TELÉFONO</span><button id="right" type="button" aria-label="Mover a la derecha">→</button></div>
-<section class="panel" id="finish" aria-live="polite" hidden><p class="eyebrow">Reporte de descenso</p><h2>Caída terminada</h2><p class="metrics" id="result"></p><p id="detail"></p><button class="cta" id="replay">Volver a jugar</button></section>
+<section class="panel" id="finish" aria-live="polite" hidden><h2>Se terminó el juego</h2><p class="metrics" id="result"></p><p id="detail"></p><button class="cta" id="replay">Volver a jugar</button></section>
 </main>
 <script>
 (() => {
@@ -47,13 +56,14 @@ const palette={stone:[.42,.34,.33],stoneHi:[.8,.43,.26],water:[.13,.67,.88],cyan
 // Endless freefall rules; independent obstacle and pickup streams.
 const XMIN=-2.75, XMAX=2.75, YMIN=-2.1, YMAX=.65, START_Y=-.97;
 const START_SPEED=11, MAX_SPEED=25, SPAWN_DEPTH=37, START_LIVES=3, INVINCIBILITY=1.22;
+const ENTITY_EXIT=-10.5, ROCK_FATAL=1.65, WATER_FATAL=1.85;
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const mix=(a,b,t)=>a+(b-a)*t;
 function seeded(seed){let a=seed>>>0;return ()=>{a=(a+0x6D2B79F5)|0;let t=Math.imul(a^a>>>15,a|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296;};}
 function fresh(seed){
  const hazardRandom=seeded(seed^0x9b9d7c51),coreRandom=seeded(seed^0x5f356495);
- return {x:0,y:START_Y,tx:0,ty:START_Y,vx:0,vy:0,elapsed:0,distance:0,speed:START_SPEED,shield:0,lives:START_LIVES,hits:0,cores:0,score:0,streak:0,
- entities:[], nextHazard:randomBetween(hazardRandom,.12,.43),nextCore:randomBetween(coreRandom,.35,1.72),hazardRandom,coreRandom,notice:'',noticeUntil:0};
+ return {x:0,y:START_Y,tx:0,ty:START_Y,vx:0,vy:0,elapsed:0,distance:0,speed:START_SPEED,shield:0,lives:START_LIVES,hits:0,cores:0,score:0,streak:0,pickupGlowUntil:0,
+ entities:[], fatalTrigger:null, nextHazard:randomBetween(hazardRandom,.12,.43),nextCore:randomBetween(coreRandom,.35,1.72),hazardRandom,coreRandom,notice:'',noticeUntil:0};
 }
 function randomBetween(r,a,b){return mix(a,b,r());}
 function dangerDistance(a,b){return Math.hypot((a.x-b.x),(a.y-b.y)*.80);}
@@ -97,29 +107,30 @@ function advance(g,dt,dx=0,dy=0){
   spawnCore(g);g.nextCore=g.elapsed+randomBetween(g.coreRandom,1.05,2.87);
  }
  for(const o of g.entities){
-  o.z-=g.speed*dt;
-  // Contact window around the phone. Evaluate actual continuous field position, not target or lane.
-  const depth=o.kind==='core'?.41:.42+o.r*.24;
-  if(o.seen||o.z>depth||o.z<-depth||!contact(g,o))continue;
+  const priorZ=o.z;o.z-=g.speed*dt;
+  // Resolve once at the player plane; geometry passes through independently.
+  if(o.seen||priorZ<=0||o.z>0)continue;
   o.seen=true;
+  const crossing=priorZ/(priorZ-o.z);
+  if(!contact({x:mix(oldX,g.x,crossing),y:mix(oldY,g.y,crossing)},o))continue;
   if(o.kind==='core'){
-   g.cores++;g.streak++;g.notice='Núcleo +50';g.noticeUntil=g.elapsed+.66;
+   o.collected=true;g.cores++;g.streak++;g.pickupGlowUntil=g.elapsed+.42;g.notice='Núcleo +50';g.noticeUntil=g.elapsed+.66;
   }else if(g.elapsed>=g.shield){
    g.lives--;g.hits++;g.streak=0;g.shield=g.elapsed+INVINCIBILITY;
    g.notice=o.kind==='water'?'Onda · −1 vida':'Impacto · −1 vida';g.noticeUntil=g.elapsed+.87;
-   if(!g.lives)break;
+   if(!g.lives){g.fatalTrigger={kind:o.kind,x:o.x,y:o.y,z:0,r:o.r,seed:o.seed};break;}
   }
  }
- g.entities=g.entities.filter(o=>o.z>-6&&!(o.kind==='core'&&o.seen));
+ g.entities=g.entities.filter(o=>o.z>ENTITY_EXIT&&!o.collected);
  g.score=Math.floor(g.distance)+g.cores*50;
 }
-let state='intro', game=fresh(1),x=0,y=START_Y,vx=0,vy=0,shield=0,elapsed=0,speed=START_SPEED,distance=0,entities=game.entities;
-let best=0,last,activeDrag=null;
+let state='intro', game=fresh(1),x=0,y=START_Y,vx=0,vy=0,shield=0,elapsed=0,speed=START_SPEED,distance=0,pickupGlowUntil=0,entities=game.entities;
+let best=0,last,activeDrag=null,fatal=null;
 const held=new Set(), heldButtons=new Map();
 try{best=Number(sessionStorage.getItem('honor3d-v2-best'))||0;}catch{}
 const phases=['01 / Garganta mineral','02 / Corriente azul','03 / Ruptura final'];
 const text=(id,value)=>{const el=$(id);if(el&&el.textContent!==value)el.textContent=value;};
-function syncGame(){({x,y,vx,vy,shield,elapsed,speed,distance,entities}=game);}
+function syncGame(){({x,y,vx,vy,shield,elapsed,speed,distance,pickupGlowUntil,entities}=game);}
 function resetInput(){held.clear();heldButtons.clear();activeDrag=null;}
 function updateHud(){
  text('score',String(game.score).padStart(3,'0'));
@@ -130,10 +141,18 @@ function updateHud(){
  $('bar').style.transform='scaleX('+(.11+.89*(game.speed-START_SPEED)/(MAX_SPEED-START_SPEED)).toFixed(3)+')';
  text('phase',phases[game.elapsed<15?0:game.elapsed<37?1:2]);
  text('signal',game.elapsed<game.noticeUntil?game.notice:'');
+ const signal=$('signal'), tone=game.elapsed<game.pickupGlowUntil?'gold':'impact';
+ if(signal.getAttribute('data-tone')!==tone)signal.setAttribute('data-tone',tone);
 }
 function start(){
- game=fresh(Math.floor(Math.random()*4294967296));syncGame();resetInput();state='play';last=undefined;
+ game=fresh(Math.floor(Math.random()*4294967296));fatal=null;syncGame();resetInput();state='play';last=undefined;
  $('intro').hidden=$('finish').hidden=true;$('keys').hidden=false;updateHud();canvas.focus({preventScroll:true});
+}
+function beginFatal(ms){
+ const impact=game.fatalTrigger;
+ if(!impact)return;
+ fatal={...impact,at:ms/1000,progress:0,duration:impact.kind==='water'?WATER_FATAL:ROCK_FATAL};
+ state='fatal';resetInput();$('keys').hidden=true;text('signal','');
 }
 function finish(){
  state='finish';resetInput();$('keys').hidden=true;text('signal','');
@@ -150,9 +169,17 @@ function frame(ms){
   const dx=Number(has('arrowright','d')||dirs.includes(1))-Number(has('arrowleft','a')||dirs.includes(-1));
   const dy=Number(has('arrowup','w'))-Number(has('arrowdown','s'));
   while(dt>0&&game.lives>0){const step=Math.min(dt,1/90);advance(game,step,dx,dy);dt-=step;}
-  syncGame();updateHud();if(!game.lives)finish();
+  syncGame();updateHud();if(!game.lives)beginFatal(ms);
+ }else if(state==='fatal'&&!document.hidden){
+  fatal.progress=clamp(fatal.progress+dt/fatal.duration,0,1);
+  // Let surrounding hazards pass out through the camera. Never award or apply hits during the shot.
+  for(const o of game.entities)o.z-=speed*dt*(1-fatal.progress*.55);
+  game.entities=game.entities.filter(o=>o.z>ENTITY_EXIT);
+  entities=game.entities;
  }
- draw(elapsed,ms/1000);requestAnimationFrame(frame);
+ draw(elapsed,ms/1000);
+ if(state==='fatal'&&fatal.progress>=1)finish();
+ requestAnimationFrame(frame);
 }
 function attachControls(){
  const keyList=['arrowleft','arrowright','arrowup','arrowdown','a','d','w','s'];
@@ -204,10 +231,14 @@ function ringRect(w,h,r){const p=[];for(let i=0;i<4;i++){const centers=[[w/2-r,h
 function body(w,h,d,r,q,col,front,f){const points=ringRect(w,h,r),a=points.map(p=>f([p[0]+q[0],p[1]+q[1],q[2]-d])),b=points.map(p=>f([p[0]+q[0],p[1]+q[1],q[2]+d])),u=f([q[0],q[1],q[2]-d]),v=f([q[0],q[1],q[2]+d]);for(let i=0;i<a.length;i++){const j=(i+1)%a.length;tri(u,a[i],a[j],front);tri(v,b[j],b[i],shade(col,.72));quad(a[i],b[i],b[j],a[j],shade(col,.60+(i%8)*.11));}}
 function disk(q,r,d,n,col,front,f){const cen=f([q[0],q[1],q[2]-d]);for(let i=0;i<n;i++){const p=i*6.283185/n,t=(i+1)*6.283185/n,a=[q[0]+r*Math.cos(p),q[1]+r*Math.sin(p)],b=[q[0]+r*Math.cos(t),q[1]+r*Math.sin(t)];const A=f([...a,q[2]-d]),B=f([...b,q[2]-d]);tri(cen,A,B,shade(front,.91+(i%4)*.06));quad(A,f([...a,q[2]+d]),f([...b,q[2]+d]),B,col);}}
 function phone(t,clock){
- const isIntro=state==='intro',m=reduced?.10:1, roll = isIntro?-.25 + Math.sin(clock*.85)*.055:m*(-.12 + Math.sin(t*2.3)*.09 + clamp(-vx*.051,-.27,.27)), lean=isIntro?-.48+m*Math.sin(clock*1.3)*.095:m*(-.27 + Math.sin(t*1.45)*.25 + clamp(vx*.048,-.26,.26)), pitch=isIntro?.19+m*Math.cos(clock*.9)*.04:m*(.23+Math.cos(t*2.2)*.18+clamp(vy*.055,-.20,.20));
- const center=isIntro?[0,.26,-1.3]:[x,y,0], scale=isIntro?1.13:.93, f=p=>transf(p.map(v=>v*scale),center,roll,lean,pitch), damage=state==='play'&&shield>elapsed;
- const glass=damage?[.65,.30,.20]:[.13,.53,.55], trim=damage?[.98,.59,.37]:[.62,.91,.86];
- body(1.13,2.10,.086,.147,[0,0,0],trim,[.30,.69,.62],f);
+ const isCrash=state==='fatal'||(state==='finish'&&fatal), isIntro=state==='intro',m=reduced?.10:1, roll = isIntro?-.25 + Math.sin(clock*.85)*.055:m*(-.12 + Math.sin(t*2.3)*.09 + clamp(-vx*.051,-.27,.27)), lean=isIntro?-.48+m*Math.sin(clock*1.3)*.095:m*(-.27 + Math.sin(t*1.45)*.25 + clamp(vx*.048,-.26,.26)), pitch=isIntro?.19+m*Math.cos(clock*.9)*.04:m*(.23+Math.cos(t*2.2)*.18+clamp(vy*.055,-.20,.20));
+ const p=isCrash?fatal.progress:0;
+ if(isCrash&&fatal.kind==='rock'){phoneShards(p);return;}
+ const cameraAspect=width/Math.max(1,height), introDepth=-2.15+(cameraAspect>.68?.65:0);
+ const center=isIntro?[0,.39+clamp((770-arena.clientHeight)/240,0,.58),introDepth]:[x,y-(isCrash?.30*p:0),isCrash?1.4*p:0], scale=isIntro?1.13:.93, f=p=>transf(p.map(v=>v*scale),center,roll,lean,pitch), damage=state==='play'&&shield>elapsed;
+ const soaked=isCrash&&fatal.kind==='water', dim=soaked?1-.91*clamp((p-.13)/.72,0,1):1;
+ const glass=soaked?shade([.30,.55,.63],dim):damage?[.65,.30,.20]:[.13,.53,.55], trim=soaked?shade([.62,.91,.86],dim):damage?[.98,.59,.37]:[.62,.91,.86];
+ body(1.13,2.10,.086,.147,[0,0,0],trim,soaked?shade([.30,.69,.62],dim):[.30,.69,.62],f);
  body(1.09,2.06,.031,.13,[0,0,-.078],[.41,.82,.75],glass,f);
  body(1.024,1.989,.007,.108,[0,0,-.109],glass,shade(glass,1.14),f);
  // A polished corner-to-corner reflection and frosted lower back.
@@ -233,9 +264,88 @@ const raw=[[0,1,0],[0,-.85,0],[-1,0,0],[0,0,-1],[1,0,0],[0,0,1]];
 function rock(q,r,seed,col){const p=raw.map((v,i)=>transf(v.map((u,j)=>u*r*(.68+.39*Math.sin(seed+i*13+j*29)**2)),q,seed*.71,seed*.39,.4));for(let i=0;i<4;i++){let a=i+2,b=(i+1)%4+2;tri(p[0],p[a],p[b],shade(col,.70+i*.16));tri(p[1],p[b],p[a],shade(col,.52+i*.16));}}
 function water(q,r,t){const n=12;for(let i=0;i<n;i++){const a=i/n*Math.PI*2,b=(i+1)/n*Math.PI*2,fn=(ang,size)=>[q[0]+Math.cos(ang)*size,q[1]+Math.sin(ang)*size*.68,q[2]+.17*Math.sin(ang*3+t*4)];quad(fn(a,r),fn(b,r),fn(b,r*.69),fn(a,r*.69),shade(palette.water,.7+(i%6)*.11),.79);}}
 function core(q,r,t){rock(q,r,t*2,palette.cyan);rock([q[0],q[1]-r*1.4,q[2]],r*.27,t,palette.cyan);}
+const LOOT=[1,.708,.21],GOLDLIGHT=[1,.942,.613], ICE=[.54,.89,1];
+function tapered(a,b,w,col,alpha=1){
+ const dx=b[0]-a[0],dy=b[1]-a[1],d=Math.hypot(dx,dy)||1,nx=-dy*w/d,ny=dx*w/d;
+ tri([a[0]+nx,a[1]+ny,a[2]],[a[0]-nx,a[1]-ny,a[2]],b,col,alpha);
+}
+function splash(q,r,t){
+ // One opaque enough, asymmetric mass with detached droplets, not a ring with a false safe center.
+ const [x,y,z]=q,n=17;
+ const c=[x,y-.12*r,z-.17*r], shore=[];
+ for(let j=0;j<n;j++){
+  const a=j*Math.PI*2/n, wave=.70+.077*Math.sin(3*a+t*1.7)+.076*Math.sin(7*a-t*2.6);
+  shore.push([x+Math.cos(a)*r*wave, y+Math.sin(a)*r*wave*.70,z+.14*r*Math.cos(2*a+t)]);
+ }
+ for(let j=0;j<n;j++){
+  const a=shore[j],b=shore[(j+1)%n];tri(c,a,b,shade([.17,.73,.91],.82+(j%6)*.065),.88);
+  if(j%2===0){
+   const a0=[x+(a[0]-x)*.65,y+(a[1]-y)*.60,z-.23*r],tip=[x+(a[0]-x)*(1.28+(j%3)*.1),y+(a[1]-y)*(.87+(j%4)*.08),z-.34*r];
+   tapered(a0,tip,r*(.05+(j%4)*.013),ICE,.83);
+   const d=[x+(tip[0]-x)*1.13,y+(tip[1]-y)*1.15+.08*r,z-.30*r];
+   rock(d,r*(.038+(j%3)*.016),j*3.15+t,[.48,.88,.99]);
+  }
+ }
+ for(let k=0;k<6;k++){
+  const a=(k*.76+.29)*Math.PI, p=[x+Math.sin(a)*r*.45,y+Math.cos(a)*r*.31,z-.31*r],b=[p[0]+(.16-.11*Math.sin(a))*r,p[1]+(.05+Math.cos(a)*.075)*r,z-.34*r];
+  tapered(p,b,r*.025,ICE,.55);
+ }
+}
+function goldCore(q,r,t){
+ const f=p=>transf(p,q,Math.sin(t*1.1)*.26,t*1.38,Math.sin(t*.9)*.25);
+ const a=f([0,r*1.34,0]), b=f([0,-r*1.26,0]), hex=[];
+ for(let i=0;i<6;i++){const theta=i*Math.PI/3;hex.push(f([r*.87*Math.cos(theta),0,r*.87*Math.sin(theta)]));}
+ for(let i=0;i<6;i++){const c=hex[i],d=hex[(i+1)%6];tri(a,c,d,shade(i%3===0?GOLDLIGHT:LOOT,.81+(i%4)*.137));tri(b,d,c,shade(LOOT,.64+(i%4)*.119));}
+ const [x,y,z]=q; for(const [dx,dy,a] of [[-.33,.20,.60],[.27,-.39,.37],[.39,.22,.45]]){const k=r*(.68+Math.sin(t*5+dx)*.14);tapered([x+dx,y+dy,z-.52*r],[x+dx,y+dy+k,z-.52*r],r*.024,GOLDLIGHT,a);tapered([x+dx-k*.38,y+dy+k*.4,z-.52*r],[x+dx+k*.38,y+dy+k*.4,z-.52*r],r*.022,GOLDLIGHT,a);}
+}
+function lootBurst(a){
+ const p=1-a,n=reduced?7:14;
+ for(let i=0;i<n;i++){const t=i*Math.PI*2/n, r=.24+p*(1.0+(i%3)*.38),q=[x+Math.cos(t)*r,y+Math.sin(t)*r,-.75-(i%4)*.09];
+  tapered(q,[q[0]+Math.cos(t)*(.13+p*.23),q[1]+Math.sin(t)*(.13+p*.23),q[2]],.026+(i%3)*.019,i%3===0?LOOT:GOLDLIGHT,a);
+ }
+}
+function phoneShards(p){
+ const s=Math.min(1,p*2.5), drift=reduced?.47:1, a=[-.53,-.99],b=[.53,-.99],c=[.53,.99],d=[-.53,.99],L=[-.53,.18],U=[.53,-.08],bridge=[.04,.03],k=[-.16,-.19],k2=[.22,.25];
+ const busted=[{poly:[d,c,U,k2,bridge,k,L],sign:1},{poly:[L,k,bridge,k2,U,b,a],sign:-1}];
+ for(const {poly,sign} of busted){
+  const f=q=>transf(q,[x+sign*s*.62*drift,y+sign*s*.18*drift-p*p*.64, .2+p*.52],-.18+sign*s*.60*drift,-.28+sign*s*.72*drift, .18+s*.18);
+  const back=poly.map(([a,b])=>f([a,b,-.085])), front=poly.map(([a,b])=>f([a,b,.077]));
+  // Ear decompositions of the two pieces. Zig-zag edges remain open as they separate.
+  const faces=sign>0?[[0,1,3],[1,2,3],[0,3,4],[0,4,6],[4,5,6]]:[[0,1,6],[1,2,6],[2,3,5],[3,4,5],[2,5,6]];
+  for(const [a,b,c] of faces){tri(back[a],back[b],back[c],[.22,.57,.53]);tri(front[a],front[c],front[b],[.08,.22,.31]);}
+  for(let i=0;i<poly.length;i++){const j=(i+1)%poly.length;quad(back[i],back[j],front[j],front[i],i>1&&i<6?[.92,.62,.38]:[.60,.87,.81]);}
+  if(sign>0){body(.485,.48,.026,.075,[-.21,.59,-.107],[.43,.63,.60],[.043,.118,.128],f);for(const [a,b] of [[-.32,.70],[-.32,.49],[-.09,.70]])disk([a,b,-.155],.072,.02,10,[.52,.77,.78],[.06,.15,.23],f);}
+ }
+}
+function rockCrash(p){
+ const burst=Math.min(1,p*3.5), keep=1-p, center=[fatal.x,fatal.y,0], n=reduced?12:28;
+ for(let i=0;i<n;i++){
+  const t=dropDecor(i,4)*Math.PI*2,r=burst*(.33+dropDecor(i,9)*2.27)*(reduced?.64:1),z=(i%5)*.31-burst*(.84+dropDecor(i,17)*3.23), c=[center[0]+Math.cos(t)*r,center[1]+Math.sin(t)*r-p*.44,z];
+  if(i%3===0)rock(c,(.044+dropDecor(i,10)*.16)*(.33+keep),1+i+burst*6,i%2===0?[.99,.65,.35]:[.46,.59,.60]);
+  else if(keep>.025)tapered(c,[c[0]+Math.cos(t)*(.16+burst*.26),c[1]+Math.sin(t)*(.16+burst*.26),c[2]-.08],.04,i%2===0?LOOT:ICE,keep*.86);
+ }
+}
+function waterCrash(p,t){
+ const f=Math.min(1,p*4.0), remain=1-p;
+ if(p<.60)splash([x,y-.16-p*.16,-.52],(.76+f*.91)*(reduced?.80:1),t*2.4);
+ for(let i=0;i<(reduced?10:23);i++){
+  const a=i*2.39996,r=(.46+dropDecor(i,25)*1.36)*f,q=[x+Math.cos(a)*r,y+Math.sin(a)*r-p*p*.55,-.68-f*dropDecor(i,4)*1.85];
+  if(remain>.05)tapered(q,[q[0]+Math.cos(a)*(.13+.31*f),q[1]+Math.sin(a)*(.13+.31*f),q[2]-.18],.04,ICE,remain*.76);
+ }
+ if(p>.04&&p<.68)for(let j=0;j<(reduced?3:7);j++){
+  const angle=(j+.5)*Math.PI*2/7,reach=(.56+dropDecor(j,83)*1.12)*(1+p*.85),seed=Math.floor(p*26),light=(1-p/.69)*(reduced?.61:.95);
+  let a=[x+Math.cos(angle)*.18,y+Math.sin(angle)*.21,-1.02];
+  for(let i=1;i<=5;i++){
+   const f=i/5,jitter=(dropDecor(j*5+i,seed)-.5)*.42*(.4+f),b=[x+Math.cos(angle)*f*reach-Math.sin(angle)*jitter,y+Math.sin(angle)*f*reach+Math.cos(angle)*jitter,-1.02-i*.055];
+   tapered(a,b,.040,[.32,.67,1],light*.58);tapered([a[0],a[1],a[2]-.015],[b[0],b[1],b[2]-.015],.018,[.86,.95,1],light);
+   a=b;
+  }
+ }
+}
 function dropOptics(){
  const pace=state==='intro'?0:clamp((speed-11)/17,0,1);
- const sy=1.94-pace*(reduced?.02:.12), sx=Math.min(1.67,sy*height/Math.max(1,width));
+ const focal=(.797-pace*(reduced?.007:.027))*Math.min(width,height);
+ const sx=2*focal/Math.max(1,width),sy=2*focal/Math.max(1,height);
  return [sx,sy];
 }
 function dragScale(){
@@ -252,8 +362,23 @@ function fallingStreak(x,y,z,trail,col,a){
  const sign=x<0?-1:1;
  tri([x,y,z],[x+sign*.033,y-.068,z],[x*.94,y*.89+.16,z+trail],col,a);
 }
+// Clip triangles before perspective division instead of clamping each vertex.
+function clipNear(vertices){
+ const z=-6.699,out=[];
+ for(let i=0;i<vertices.length;i++){
+  const a=vertices[i],b=vertices[(i+1)%vertices.length],inside=a[2]>=z,next=b[2]>=z;
+  if(inside)out.push(a);
+  if(inside!==next){const t=(z-a[2])/(b[2]-a[2]);out.push([mix(a[0],b[0],t),mix(a[1],b[1],t),z]);}
+ }
+ return out;
+}
 function draw(t,clock){
  if(!gl&&!ctx)return;
+ const impact=(state==='fatal'||state==='finish')&&fatal?fatal.kind:'';
+ const fade=$('fatal-fade'),loot=typeof pickupGlowUntil!=='undefined'?clamp((pickupGlowUntil-elapsed)/.42,0,1):0;
+ if(arena.dataset.impact!==impact)arena.dataset.impact=impact;
+ if(arena.dataset.loot!==(loot?'yes':'no'))arena.dataset.loot=loot?'yes':'no';
+ if(fade)fade.style.opacity=impact==='water'?String(.97*clamp((fatal.progress-.37)/.63,0,1)):'0';
  vertices=[];triangles=[];
  const [sx,sy]=dropOptics(), pace=state==='intro'?0:clamp((speed-11)/17,0,1);
  const depth=state==='intro'?(reduced?0:clock*1.85):distance;
@@ -283,23 +408,25 @@ function draw(t,clock){
  const splashTime=reduced?0:clock;
  const draws=state==='intro'?[{kind:'rock',x:-2.9,y:-.5,z:14,r:1.08,seed:31},{kind:'water',x:2.8,y:.2,z:18,r:.86,seed:5},{kind:'core',x:-.2,y:1.4,z:29,r:.34,seed:1}]:entities;
  for(const e of draws){
-   if(e.z<-.92||e.z>68)continue;
+   if(e.z<-10.5||e.z>68)continue;
+   if(impact && e.kind===fatal.kind && e.seed===fatal.seed)continue;
    const q=[e.x,e.y,e.z],r=e.r,grain=e.seed||0;
    if(e.kind==='rock'){
     rock(q,r,grain+splashTime*.31,[.77,.41,.27]);
     rock([q[0]-r*.28,q[1]+r*.23,q[2]-.13],r*.52,grain+20+splashTime*.08,[.97,.60,.35]);
    }else if(e.kind==='water'){
-    water(q,r,splashTime+grain);
-    water([q[0],q[1],q[2]+.25],r*.72,-splashTime-grain);
-    for(let i=0;i<6;i++){const a=dropDecor(grain,i)*Math.PI*2+clock*.21;const w=r*(1+(i%3)*.11);rock([q[0]+Math.cos(a)*w,q[1]+Math.sin(a)*w*.76,q[2]+.12],r*.057,i,[.49,.9,.96]);}
+    splash(q,r,splashTime+grain);
    }else if(e.kind==='core'){
-    core(q,r,splashTime*.71+grain);water([q[0],q[1],q[2]+.13],r*1.32,splashTime*.75);
+    goldCore(q,r,splashTime*.71+grain);
    }
  }
  if(state==='play'&&!reduced&&pace>.17){
    for(let i=0;i<5;i++)fallingStreak(x+(i-2)*.17,y+.27+i*.09,.85+i*.36,pace*2.05,[.45,.98,1],.18+pace*.093);
  }
  phone(t,clock);
+ if(loot>0&&state==='play')lootBurst(loot);
+ if(impact==='water')waterCrash(fatal.progress,splashTime);
+ if(impact==='rock')rockCrash(fatal.progress);
  if(gl){
   gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
   gl.uniform2f(screen,sx,sy); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(vertices),gl.DYNAMIC_DRAW); gl.drawArrays(gl.TRIANGLES,0,vertices.length/7);
@@ -307,10 +434,11 @@ function draw(t,clock){
   ctx.clearRect(0,0,width,height);
   triangles.sort((a,b)=>b[5]-a[5]);
   for(const [a,b,c,col,alpha] of triangles){
-   if(a[2]<-6.69&&b[2]<-6.69&&c[2]<-6.69)continue;
+   const face=a[2]>=-6.699&&b[2]>=-6.699&&c[2]>=-6.699?[a,b,c]:clipNear([a,b,c]);
+   if(face.length<3)continue;
    ctx.beginPath();
-   for(const [i,p] of [a,b,c].entries()){
-    const z=Math.max(.3,p[2]+7),u=(p[0]*sx/z+1)*width/2,v=(1-p[1]*sy/z)*height/2;
+   for(const [i,p] of face.entries()){
+    const z=p[2]+7,u=(p[0]*sx/z+1)*width/2,v=(1-p[1]*sy/z)*height/2;
     i?ctx.lineTo(u,v):ctx.moveTo(u,v);
    }
    ctx.closePath();
