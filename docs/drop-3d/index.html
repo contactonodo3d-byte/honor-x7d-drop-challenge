@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="es">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#060c14"><title>HONOR X7d · Drop Challenge 3D</title>
+<style>
+:root{color-scheme:dark;--ink:#e9faff;--dim:#91acbb;--core:#81f6ff;--edge:#4d808f60}
+*{box-sizing:border-box} [hidden]{display:none!important} body{margin:0;background:#060c14;color:var(--ink);font:500 14px/1.4 system-ui,sans-serif;overscroll-behavior:none}
+#arena{position:relative;isolation:isolate;margin:auto;width:min(100%,660px);height:100svh;min-height:420px;overflow:hidden;background:radial-gradient(ellipse at 50% 36%,#227481 0%,#0c3445 29%,#091926 57%,#060c14 85%);box-shadow:0 0 100px #14556835}
+canvas{display:block;position:absolute;inset:0;width:100%;height:100%;touch-action:none;outline:none} canvas:focus-visible{outline:2px inset var(--core)}
+#vignette{pointer-events:none;position:absolute;inset:0;background:linear-gradient(#060c14eb,transparent 25%,transparent 65%,#060c14de);box-shadow:inset 0 0 70px #050a1290}
+.hud{position:absolute;z-index:1;top:max(14px,env(safe-area-inset-top));left:16px;right:16px;pointer-events:none}
+.head,.stats,.keys{display:flex;align-items:center;justify-content:space-between;gap:12px}.head{padding:4px 0 10px;border-bottom:1px solid var(--edge);letter-spacing:.15em;text-transform:uppercase;font-size:10px;font-weight:850}.brand{color:var(--ink);font-size:16px;letter-spacing:.26em}.code{color:var(--core)} .stats{margin:9px 0 6px}.label,.eyebrow{font-size:10px;font-weight:850;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}.stat:last-child{text-align:right}.value{display:block;font-size:25px;font-weight:850;font-variant-numeric:tabular-nums;line-height:1.1}.progress{height:3px;background:#78c0d331;overflow:hidden}.progress>span{display:block;height:100%;background:var(--core);transform-origin:left;box-shadow:0 0 10px #38cbe8}
+#phase,#signal{margin:8px 0 0;text-align:center;color:var(--core);font-size:10px;font-weight:800;letter-spacing:.22em;text-transform:uppercase}#signal{color:#fbc08e;min-height:14px}
+.panel{position:absolute;z-index:2;left:clamp(14px,6%,36px);right:clamp(14px,6%,36px);bottom:max(16px,env(safe-area-inset-bottom));padding:clamp(14px,4vw,23px);border:1px solid var(--edge);border-radius:20px;background:#091625ec;box-shadow:0 12px 55px #02050be3}
+.eyebrow{color:var(--core);margin:0 0 7px}h1,h2{font-size:clamp(34px,8.5vw,58px);letter-spacing:-.065em;line-height:.9;margin:0 0 12px;text-transform:uppercase;font-weight:950}h1 em{color:var(--core);font-style:normal}p{margin:0 0 10px;color:#c1d6e0}.fine{color:var(--dim);font-size:11px;margin:9px 0 0}
+button{touch-action:manipulation;background:var(--core);color:#06161c;border:0;border-radius:10px;padding:12px 16px;min-height:46px;font:850 14px system-ui;cursor:pointer}button:focus-visible{outline:2px solid #fff;outline-offset:3px}.cta{width:100%}.keys{position:absolute;z-index:2;bottom:max(12px,env(safe-area-inset-bottom));left:16px;right:16px;justify-content:center;gap:12px;pointer-events:none}.keys button{pointer-events:auto;background:#0a2736d9;color:#cefdff;border:1px solid #72dbea86;font-size:20px;min-width:62px}.keys span{font-size:10px;color:#bcdee5;letter-spacing:.16em;text-align:center}.metrics{font-weight:700;color:var(--core)} a{color:#a7eff8;text-underline-offset:2px} #fallback{margin-top:8px}
+@media(max-height:530px){.panel{padding:12px}h1,h2{font-size:30px;margin-bottom:6px}.label{font-size:8px}.value{font-size:18px}.head{padding-bottom:5px}.fine{margin-top:6px}}
+</style></head>
+<body><main id="arena" aria-label="HONOR X7d Drop Challenge 3D">
+<canvas id="scene" aria-label="Pista con tres carriles" tabindex="0"></canvas><div id="vignette"></div>
+<header class="hud"><div class="head"><strong class="brand">HONOR</strong><span class="code">X7d / 3D PROTOTIPO</span></div><div class="stats"><div class="stat"><span class="label">Puntaje</span><strong class="value" id="score">000</strong></div><div class="stat"><span class="label">Tiempo</span><strong class="value" id="time">30.0</strong></div></div><div class="progress"><span id="bar"></span></div><p id="phase">01 / Garganta mineral</p><p id="signal"></p></header>
+<section class="panel" id="intro"><p class="eyebrow">30 segundos · 3 carriles</p><h1>Drop<br>Challenge <em>3D</em></h1><p>Guiá el teléfono en caída libre. Esquivá rocas y ondas y buscá los núcleos turquesa.</p><button class="cta" id="start">Iniciar descenso</button><p class="fine">Deslizá o usá ← →. Demo: modelo ilustrativo, no es una prueba de resistencia. Sin registro. <a href="../">Versión original</a>.</p><p class="fine" id="fallback" hidden></p></section>
+<div class="keys" id="keys" hidden><button id="left" type="button" aria-label="Mover a la izquierda">←</button><span>DESLIZÁ<br>O TOCÁ</span><button id="right" type="button" aria-label="Mover a la derecha">→</button></div>
+<section class="panel" id="finish" aria-live="polite" hidden><p class="eyebrow">Reporte de descenso</p><h2>Caída completa</h2><p class="metrics" id="result"></p><p id="detail"></p><button class="cta" id="replay">Volver a jugar</button></section>
+</main>
+<script>
+(() => {
+'use strict';
+const $=id=>document.getElementById(id); let canvas=$('scene'); const arena=$('arena'), reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const LANE=2.03, DURATION=30, STEP=2.75, APPROACH=2.4, FIRST=3.1, SPEED=14;
+const phases=['01 / Garganta mineral','02 / Corriente azul','03 / Ruptura final'];
+const palette={stone:[.42,.34,.33],stoneHi:[.8,.43,.26],water:[.13,.67,.88],cyan:[.32,1,1],metal:[.11,.45,.51],lens:[.016,.038,.075],rim:[.68,.93,.95],face:[.025,.12,.20]};
+const clamp=(n,a,b)=>Math.max(a,Math.min(b,n)), mix=(a,b,t)=>a+(b-a)*t;
+let state='intro', elapsed=0, lane=1, x=0, shield=0, hits=0, cores=0, score=0, best=0, waves=[], swipe=null, last, width=0,height=0;
+try{best=Number(sessionStorage.getItem('honor3d-best'))||0;}catch{}
+let gl=null, ctx=null, mode='projection', program, buffer, screen, place;
+const vs='attribute vec3 a;attribute vec4 c;uniform vec2 s;varying vec4 v;void main(){float z=a.z+7.0;gl_Position=vec4(a.x*s.x,a.y*s.y,(1.0-2.0*0.3/80.0)*z-0.6,z);v=c;}';
+const fs='precision mediump float;varying vec4 v;void main(){gl_FragColor=v;}';
+function shader(kind,src){const s=gl.createShader(kind);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s;}
+function graphics(){
+ try{gl=canvas.getContext('webgl',{alpha:true,antialias:true,premultipliedAlpha:false});if(gl){program=gl.createProgram();gl.attachShader(program,shader(gl.VERTEX_SHADER,vs));gl.attachShader(program,shader(gl.FRAGMENT_SHADER,fs));gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));gl.useProgram(program);buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);place=[gl.getAttribLocation(program,'a'),gl.getAttribLocation(program,'c')];screen=gl.getUniformLocation(program,'s');gl.enableVertexAttribArray(place[0]);gl.enableVertexAttribArray(place[1]);gl.vertexAttribPointer(place[0],3,gl.FLOAT,false,28,0);gl.vertexAttribPointer(place[1],4,gl.FLOAT,false,28,12);gl.enable(gl.DEPTH_TEST);gl.enable(gl.BLEND);gl.blendFuncSeparate(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA,gl.ONE,gl.ONE_MINUS_SRC_ALPHA);mode='webgl';}}
+ catch{gl=null;const replacement=canvas.cloneNode();canvas.replaceWith(replacement);canvas=replacement;}
+ if(!gl){ctx=canvas.getContext('2d');const note=$('fallback');note.hidden=false;note.textContent=ctx?'Modo compatible: este navegador no activó WebGL.':'Este navegador no pudo abrir el juego. Podés probar la versión original.';if(!ctx){mode='unavailable';$('start').disabled=true;}}arena.dataset.renderer=mode;
+}
+function resize(){const b=arena.getBoundingClientRect(), d=Math.min(1.55,devicePixelRatio||1);width=canvas.width=Math.round(b.width*d);height=canvas.height=Math.round(b.height*d);if(gl)gl.viewport(0,0,width,height);}
+let triangles=[], vertices=[];
+function tri(a,b,c,col,alpha=1){if(gl){for(const v of [a,b,c])vertices.push(...v,...col,alpha);}else triangles.push([a,b,c,col,alpha,(a[2]+b[2]+c[2])/3]);}
+function quad(a,b,c,d,col,alpha){tri(a,b,c,col,alpha);tri(a,c,d,col,alpha);}
+function shade(col,v){return col.map(n=>clamp(n*v,0,1));}
+function transf(p,q,rz=0,ry=0,rx=0){const X=p[0],Y=p[1]*Math.cos(rx)-p[2]*Math.sin(rx),Z=p[1]*Math.sin(rx)+p[2]*Math.cos(rx),x=X*Math.cos(ry)+Z*Math.sin(ry),z=Z*Math.cos(ry)-X*Math.sin(ry);return [x*Math.cos(rz)-Y*Math.sin(rz)+q[0],x*Math.sin(rz)+Y*Math.cos(rz)+q[1],z+q[2]];}
+function ringRect(w,h,r){const p=[];for(let i=0;i<4;i++){const centers=[[w/2-r,h/2-r],[-w/2+r,h/2-r],[-w/2+r,-h/2+r],[w/2-r,-h/2+r]],c=centers[i];for(let j=0;j<=3;j++){const a=i*Math.PI/2+j*Math.PI/6;p.push([c[0]+r*Math.cos(a),c[1]+r*Math.sin(a)]);}}return p;}
+function body(w,h,d,r,q,col,front,f){const points=ringRect(w,h,r),a=points.map(p=>f([p[0]+q[0],p[1]+q[1],q[2]-d])),b=points.map(p=>f([p[0]+q[0],p[1]+q[1],q[2]+d])),u=f([q[0],q[1],q[2]-d]),v=f([q[0],q[1],q[2]+d]);for(let i=0;i<a.length;i++){const j=(i+1)%a.length;tri(u,a[i],a[j],front);tri(v,b[j],b[i],shade(col,.72));quad(a[i],b[i],b[j],a[j],shade(col,.60+(i%8)*.11));}}
+function disk(q,r,d,n,col,front,f){const cen=f([q[0],q[1],q[2]-d]);for(let i=0;i<n;i++){const p=i*6.283185/n,t=(i+1)*6.283185/n,a=[q[0]+r*Math.cos(p),q[1]+r*Math.sin(p)],b=[q[0]+r*Math.cos(t),q[1]+r*Math.sin(t)];const A=f([...a,q[2]-d]),B=f([...b,q[2]-d]);tri(cen,A,B,shade(front,.91+(i%4)*.06));quad(A,f([...a,q[2]+d]),f([...b,q[2]+d]),B,col);}}
+function phone(t, clock){
+ const ease=(lane-1)*LANE-x, z=state==='play'?0:1.45, y=state==='play'?-1.35:.22, amp=reduced?.035:1, q=[x,y+Math.sin(clock*2)*.07*amp,z], f=p=>transf(p,q,(-.19+Math.sin(t*2.6)*.13)*amp+ease*.12,(-.3+Math.sin(clock*2.7)*.28)*amp,Math.sin(clock*1.8)*.25*amp);
+ const shell=shield>elapsed&&state==='play'?[.72,.42,.30]:palette.metal;
+ body(1.14,2.12,.104,.135,[0,0,0],palette.rim,shell,f);
+ body(1.088,2.064,.018,.115,[0,0,-.109],shell,[.20,.60,.65],f);
+ body(.52,.60,.036,.083,[-.225,.62,-.155],palette.rim,palette.face,f);
+ for(const [a,b] of [[-.34,.75],[-.34,.48],[-.105,.75]]){disk([a,b,-.205],.104,.021,12,palette.rim,palette.rim,f);disk([a,b,-.238],.073,.014,12,palette.metal,palette.lens,f);disk([a-.017,b+.023,-.255],.019,.009,8,palette.rim,[.65,.92,1],f);}
+ disk([-.104,.491,-.213],.035,.008,8,palette.rim,[.93,.96,.68],f);
+ body(.27,.035,.002,.009,[0,-.72,-.132],palette.rim,[.68,.90,.91],f);
+}
+const raw=[[0,1,0],[0,-.85,0],[-1,0,0],[0,0,-1],[1,0,0],[0,0,1]];
+function rock(q,r,seed,col){const p=raw.map((v,i)=>transf(v.map((u,j)=>u*r*(.68+.39*Math.sin(seed+i*13+j*29)**2)),q,seed*.71,seed*.39,.4));for(let i=0;i<4;i++){let a=i+2,b=(i+1)%4+2;tri(p[0],p[a],p[b],shade(col,.70+i*.16));tri(p[1],p[b],p[a],shade(col,.52+i*.16));}}
+function water(q,r,t){const n=12;for(let i=0;i<n;i++){const a=i/n*Math.PI*2,b=(i+1)/n*Math.PI*2,fn=(ang,size)=>[q[0]+Math.cos(ang)*size,q[1]+Math.sin(ang)*size*.68,q[2]+.17*Math.sin(ang*3+t*4)];quad(fn(a,r),fn(b,r),fn(b,r*.69),fn(a,r*.69),shade(palette.water,.7+(i%6)*.11),.79);}}
+function core(q,r,t){rock(q,r,t*2,palette.cyan);rock([q[0],q[1]-r*1.4,q[2]],r*.27,t,palette.cyan);}
+function makeWaves(rng=Math.random){let prior=1;const out=[];for(let t=FIRST,i=0;t<DURATION-.35;t+=STEP,i++){let lane=i===0?1:Math.floor(clamp(rng(),0,.99999)*3);if(Math.abs(prior-lane)>1)lane=1;prior=lane;out.push({t,lane,water:t>=10&&(i%2===0||t<20),done:false});}return out;}
+function collects(w,lane){return lane===w.lane;}
+function draw(t,clock){
+ vertices=[];triangles=[];const fov=Math.min(height/width,1.60),sy=1.62,sx=sy*fov;
+ const drift=(t*11)%5.4;
+ for(let i=0;i<11;i++){const z=2.8+i*5.4-drift;if(z<-.7)continue;const fade=.8/(1+z*.055);
+  for(const j of [-1,1]){let a=j*3.95,n=j*(4.6+.35*Math.sin(i*4));quad([a,-3.0,z],[n,-.8,z],[n,-.8,z+5.4],[a,-3.0,z+5.4],shade([.12,.34,.42],fade),.74);quad([n,-.8,z],[n,.8,z],[n,.8,z+5.4],[n,-.8,z+5.4],shade([.08,.23,.31],fade),.72);
+   const l=j*1.015;quad([l-.012,-2.97,z],[l+.012,-2.97,z],[l+.012,-2.97,z+2.4],[l-.012,-2.97,z+2.4],shade(palette.cyan,fade),.56);
+   const q=[j*(3.9+.5*Math.sin(i*3)),.6+1.8*Math.sin(i*11+j),z+1.5];rock(q,.27+(i%4)*.18,i*12+j,[.17,.32,.39].map(n=>n*fade));
+  }
+ }
+ const preview={t:2.08,lane:1,water:false};
+ for(const w of state==='intro'?[preview]:waves){const delta=w.t-t;if(w.done||delta<-.24||delta>APPROACH)continue;const z=delta*SPEED,y=-1.35+Math.max(0,z)*.035;for(let j=0;j<3;j++){const q=[(j-1)*LANE,y,z];if(j===w.lane){core(q,.26,clock);continue;}if(w.water){water(q,.85,clock);water([q[0],q[1],q[2]+.5],.55,-clock);}else{rock(q,.94,j*31+w.t,palette.stone);rock([q[0]-.4,q[1]+.37,q[2]-.2],.47,j*20+w.t,palette.stoneHi);}}}
+ phone(t,clock);
+ if(gl){gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.uniform2f(screen,sx,sy);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(vertices),gl.DYNAMIC_DRAW);gl.drawArrays(gl.TRIANGLES,0,vertices.length/7);}
+ else if(ctx){ctx.clearRect(0,0,width,height);triangles.sort((a,b)=>b[5]-a[5]);for(const [a,b,c,col,alpha] of triangles){ctx.beginPath();for(const [i,p] of [a,b,c].entries()){const z=Math.max(.3,p[2]+7), u=(p[0]*sx/z+1)*width/2,v=(1-p[1]*sy/z)*height/2;i?ctx.lineTo(u,v):ctx.moveTo(u,v);}ctx.closePath();ctx.fillStyle='rgba('+col.map(x=>Math.round(x*255)).join(',')+','+alpha+')';ctx.fill();}}
+}
+function move(d){if(state==='play')lane=clamp(lane+d,0,2);}
+function start(){elapsed=0;lane=1;x=0;shield=hits=cores=score=0;swipe=null;waves=makeWaves();state='play';$('intro').hidden=$('finish').hidden=true;$('keys').hidden=false;$('signal').textContent=''; updateHud();canvas.focus({preventScroll:true});}
+function finish(){state='finish';$('keys').hidden=true;$('signal').textContent='';best=Math.max(best,score);try{sessionStorage.setItem('honor3d-best',best);}catch{}$('result').textContent=score+' puntos · '+cores+' núcleos · '+hits+' impactos';$('detail').textContent='Mejor de esta sesión: '+best+' puntos.';$('finish').hidden=false;$('replay').focus({preventScroll:true});}
+function updateHud(){$('score').textContent=String(score).padStart(3,'0');$('time').textContent=Math.max(0,DURATION-elapsed).toFixed(1);$('bar').style.transform='scaleX('+Math.max(0,1-elapsed/DURATION)+')';$('phase').textContent=phases[Math.min(2,Math.floor(elapsed/10))];}
+function frame(ms){const dt=last===undefined?0:Math.min(.10,(ms-last)/1000);last=ms;const clock=ms/1000;
+ if(state==='play'&&!document.hidden){elapsed=Math.min(DURATION,elapsed+dt);x=mix(x,(lane-1)*LANE,1-Math.exp(-dt*(reduced?24:13)));
+ for(const w of waves)if(!w.done&&elapsed>=w.t){w.done=true;const actual=clamp(1+Math.round(x/LANE),0,2);if(collects(w,actual)){cores++;$('signal').textContent='Núcleo +50';shield=elapsed;}else {hits++;$('signal').textContent=w.water?'Onda −30':'Impacto −30';shield=elapsed+.48;}}
+ if(elapsed>=shield+.55)$('signal').textContent='';
+ score=Math.max(0,Math.floor(elapsed*10+0.00001)+cores*50-hits*30);updateHud();if(elapsed>=DURATION)finish();}
+ draw(elapsed,clock);requestAnimationFrame(frame);
+}
+graphics();resize();addEventListener('resize',resize);document.addEventListener('visibilitychange',()=>{last=undefined;});
+$('start').onclick=$('replay').onclick=start;$('left').onclick=()=>move(-1);$('right').onclick=()=>move(1);
+addEventListener('keydown',e=>{if(state!=='play'||!['ArrowLeft','ArrowRight','a','d','A','D'].includes(e.key)||e.altKey||e.metaKey||e.ctrlKey)return;e.preventDefault();move(['ArrowLeft','a','A'].includes(e.key)?-1:1);});
+canvas.addEventListener('pointerdown',e=>{if(state!=='play'||swipe||e.button!==0)return;swipe={id:e.pointerId,x:e.clientX};try{canvas.setPointerCapture(e.pointerId);}catch{}});
+canvas.addEventListener('pointermove',e=>{if(!swipe||swipe.id!==e.pointerId)return;const dx=e.clientX-swipe.x,threshold=Math.max(28,Math.min(50,arena.clientWidth*.105));if(Math.abs(dx)<threshold)return;move(Math.sign(dx));swipe.x=e.clientX;});
+for(const event of ['pointerup','pointercancel','lostpointercapture'])canvas.addEventListener(event,e=>{if(swipe?.id===e.pointerId)swipe=null;});
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
